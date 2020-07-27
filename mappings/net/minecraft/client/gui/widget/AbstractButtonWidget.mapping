@@ -61,7 +61,7 @@ CLASS net/minecraft/class_339 net/minecraft/client/gui/widget/AbstractButtonWidg
 	METHOD method_25362 queueNarration (I)V
 		ARG 1 delay
 	METHOD method_25363 onFocusedChanged (Z)V
-	METHOD method_25364 getHeight ()I
+	METHOD method_25364 ___getHeight ()I
 	METHOD method_25365 setFocused (Z)V
 		ARG 1 focused
 	METHOD method_25366 narrate ()V
