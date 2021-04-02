@@ -10,7 +10,6 @@ buildscript {
 		classpath "cuchaz:enigma-cli:${project.enigma_version}"
 		classpath "net.fabricmc:stitch:${project.stitch_version}"
 		classpath "commons-io:commons-io:2.6"
-		classpath 'de.undercouch:gradle-download-task:4.0.4'
 		classpath 'net.fabricmc:tiny-remapper:0.3.1.72'
 		classpath "net.fabricmc.unpick:unpick:${project.unpick_version}"
 		classpath "net.fabricmc.unpick:unpick-format-utils:${project.unpick_version}"
@@ -18,7 +17,6 @@ buildscript {
 }
 
 plugins {
-	id 'de.undercouch.download' version '4.0.4'
 	id 'base'
 	id 'maven-publish'
 	id 'java' // for jd gen
@@ -116,6 +114,7 @@ import net.fabricmc.stitch.merge.JarMerger
 import net.fabricmc.tinyremapper.OutputConsumerPath
 import net.fabricmc.tinyremapper.TinyRemapper
 import net.fabricmc.tinyremapper.TinyUtils
+import net.fabricmc.yarn.buildlogic.task.DownloadTask
 import org.apache.commons.io.FileUtils
 
 import java.nio.charset.StandardCharsets
@@ -133,16 +132,13 @@ boolean validateChecksum(File file, String checksum) {
 	return false
 }
 
-task downloadVersionsManifest {
+task downloadVersionsManifest(type: DownloadTask) {
 	group = setupGroup
 	//inputs.property "mc_ver", minecraft_version
 	inputs.property "currenttime", new Date()
 	def manifestFile = new File(cacheFilesMinecraft, "version_manifest.json")
-	outputs.file(manifestFile)
-	doLast {
-		logger.lifecycle(":downloading minecraft versions manifest")
-		FileUtils.copyURLToFile(new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json"), manifestFile)
-	}
+	sourceUrl = new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json")
+	targetFile = manifestFile
 }
 
 def getManifestVersion(File manifestFile, String minecraft_version) {
@@ -212,23 +208,23 @@ task downloadMcJars(dependsOn: downloadWantedVersionManifest) {
 	}
 }
 
-task downloadIntermediary(type: Download) {
+task downloadIntermediary(type: DownloadTask) {
 	group = buildMappingGroup
 	def url = "https://github.com/FabricMC/intermediary/raw/master/mappings/${minecraft_version}.tiny"
-	src com.google.common.net.UrlEscapers.urlFragmentEscaper().escape(url)
-	dest new File(cacheFilesMinecraft, "${minecraft_version}-intermediary.tiny")
+	sourceUrl = new URL(com.google.common.net.UrlEscapers.urlFragmentEscaper().escape(url))
+	targetFile = new File(cacheFilesMinecraft, "${minecraft_version}-intermediary.tiny")
 }
 
-task downloadIntermediaryV2(type: Download) {
+task downloadIntermediaryV2(type: DownloadTask) {
 	group = buildMappingGroup
 	def url = "https://maven.fabricmc.net/net/fabricmc/intermediary/${minecraft_version}/intermediary-${minecraft_version}-v2.jar"
-	src com.google.common.net.UrlEscapers.urlFragmentEscaper().escape(url)
-	dest new File(cacheFilesMinecraft, "${minecraft_version}-intermediary-v2.jar")
+	sourceUrl = new URL(com.google.common.net.UrlEscapers.urlFragmentEscaper().escape(url))
+	targetFile = new File(cacheFilesMinecraft, "${minecraft_version}-intermediary-v2.jar")
 }
 
 task extractIntermediaryV2(dependsOn: downloadIntermediaryV2, type: Copy) {
 	def output = new File(cacheFilesMinecraft, "${minecraft_version}-intermediary-v2.tiny")
-	from({ zipTree(downloadIntermediaryV2.dest) }) {
+	from({ zipTree(downloadIntermediaryV2.targetFile.get()) }) {
 		include 'mappings/mappings.tiny'
 		rename 'mappings.tiny', "../${output.name}"
 	}
@@ -263,8 +259,6 @@ task downloadMcLibs(dependsOn: downloadWantedVersionManifest) {
 
 	outputs.dir(libraries)
 
-	outputs.upToDateWhen { false }
-
 	doLast {
 		if (!versionFile.exists()) {
 			throw new RuntimeException("Can't download the jars without the ${versionFile.name} file!")
@@ -294,7 +288,7 @@ task downloadMcLibs(dependsOn: downloadWantedVersionManifest) {
 
 task invertIntermediary(dependsOn: downloadIntermediary, type: FileOutput) {
 	group = buildMappingGroup
-	def v1Input = downloadIntermediary.dest
+	def v1Input = downloadIntermediary.targetFile.asFile.get()
 
 	output = new File(cacheFilesMinecraft, "${minecraft_version}-intermediary-inverted.tiny")
 	outputs.file(output)
@@ -368,7 +362,7 @@ task mapIntermediaryJar(dependsOn: [downloadMcLibs, downloadIntermediary, mergeJ
 
 	doLast {
 		logger.lifecycle(":mapping minecraft to intermediary")
-		def tinyInput = downloadIntermediary.dest
+		def tinyInput = downloadIntermediary.targetFile.asFile.get()
 		mapJar(intermediaryJar, mergedFile, tinyInput, libraries, "official", "intermediary")
 	}
 }
@@ -546,7 +540,7 @@ clean.doFirst {
 tasks.build.dependsOn "compressTiny","tinyJar","v2UnmergedYarnJar", "v2MergedYarnJar"
 
 task exportMappingsOfficial(dependsOn: downloadIntermediary) {
-	def composeInput = downloadIntermediary.dest
+	def composeInput = downloadIntermediary.targetFile.asFile.get()
 
 	doLast {
 		logger.lifecycle(":exporting mappings")

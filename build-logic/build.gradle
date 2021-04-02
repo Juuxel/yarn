@@ -7,9 +7,11 @@ repositories {
 		name "Fabric Repository"
 		url 'https://maven.fabricmc.net'
 	}
+	gradlePluginPortal()
 }
 
 dependencies {
 	api "org.ow2.asm:asm:9.1"
 	api "org.ow2.asm:asm-tree:9.1"
+	api "de.undercouch:gradle-download-task:4.1.1"
 }
